@@ -2,13 +2,26 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from sqlalchemy.orm import Session
-from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, API_KEYS
 from app.database import get_db
 from app.models import User, Role
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# Пользователь-заглушка при авторизации по API-ключу (полные права admin)
+class _APIKeyUser:
+    id = 0
+    email = "api@medhouse.kz"
+    full_name = "API Key"
+    role = "admin"
+    is_active = 1
+    created_at = datetime.utcnow()
+    updated_at = datetime.utcnow()
+
+API_KEY_USER = _APIKeyUser()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -42,15 +55,28 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     return user
 
 
+def _check_api_key(api_key: str | None) -> bool:
+    if not API_KEYS or not api_key:
+        return False
+    return api_key.strip() in API_KEYS
+
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
+    x_api_key: str | None = Depends(api_key_header),
     db: Session = Depends(get_db),
-) -> User | None:
+) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Неверные учётные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    # 1) Проверка API-ключа (заголовок X-API-Key или Bearer с ключом)
+    if _check_api_key(x_api_key):
+        return API_KEY_USER
+    if token and _check_api_key(token):
+        return API_KEY_USER
+    # 2) JWT
     if not token:
         raise credentials_exception
     try:

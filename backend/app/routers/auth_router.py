@@ -41,3 +41,15 @@ def me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active,
         created_at=current_user.created_at,
     )
+
+
+@router.get("/api-key-info")
+def api_key_info():
+    """Как подключаться по API-ключу (Postman, curl, скрипты). Без авторизации."""
+    return {
+        "message": "Для доступа по API-ключу добавьте заголовок X-API-Key с вашим ключом.",
+        "header_name": "X-API-Key",
+        "alternative": "Либо Authorization: Bearer <ваш_api_ключ>",
+        "scope": "Полный доступ (уровень admin). Ключ задаётся в backend в переменной MEDHOUSE_API_KEY.",
+        "example_curl": "curl -H \"X-API-Key: YOUR_KEY\" http://localhost:8000/api/auth/me",
+    }

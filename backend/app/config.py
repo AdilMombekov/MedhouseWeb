@@ -21,6 +21,18 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 UPLOADS_DIR.mkdir(exist_ok=True)
 TEMPLATES_DIR.mkdir(exist_ok=True)
 
+# API-ключи для доступа из Postman, curl и сторонних программ (полный доступ как admin)
+# Поддерживаются: MEDHOUSE_API_KEY или MEDHOUSE_API_KEY_1, _2, _3 (любой из них действителен)
+def _collect_api_keys():
+    keys = []
+    for name in ("MEDHOUSE_API_KEY", "MEDHOUSE_API_KEY_1", "MEDHOUSE_API_KEY_2", "MEDHOUSE_API_KEY_3"):
+        v = os.getenv(name, "").strip()
+        if v:
+            keys.append(v)
+    return keys
+
+API_KEYS = _collect_api_keys()
+
 # Google Drive
 GOOGLE_DRIVE_CREDENTIALS_FILE = os.getenv("GOOGLE_DRIVE_CREDENTIALS_FILE", "credentials.json")
 GOOGLE_DRIVE_TOKEN_FILE = os.getenv("GOOGLE_DRIVE_TOKEN_FILE", "token.json")
