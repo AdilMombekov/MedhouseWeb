@@ -99,4 +99,22 @@ def root():
 
 @app.get("/health")
 def health():
+    """Простая проверка: сервис отвечает."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Readiness: сервис и БД доступны (для Railway/K8s)."""
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.warning("Health ready failed: %s", e)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "detail": "Database unavailable"},
+        )
+    return {"status": "ok", "database": "connected"}

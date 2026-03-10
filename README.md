@@ -65,7 +65,7 @@ npm run dev
 
 - **Сборка фронта:** `cd frontend && npm run build` — результат в `frontend/dist/`.
 - **Инструкция по деплою:** см. [DEPLOY.md](DEPLOY.md) (Nginx, переменные окружения, Git).
-- **Деплой в прод (облако):** БД — **Supabase** (PostgreSQL), бэкенд — **Railway**, фронт — **Vercel**. Пошагово и чеклист — в [DEPLOY.md](DEPLOY.md) (раздел «Деплой прод: Supabase + Railway + Vercel»).
+- **Деплой в прод (облако):** БД — **Supabase**, бэкенд — **Railway**, фронт — **Vercel**. Пошаговый чеклист первого деплоя — [PROD_CHECKLIST.md](PROD_CHECKLIST.md). Подробности — [DEPLOY.md](DEPLOY.md).
 - **Сохранение в Git:** репозиторий инициализирован, первый коммит создан. Для пуша добавьте `remote` и выполните `git push`.
 
 ## Структура данных

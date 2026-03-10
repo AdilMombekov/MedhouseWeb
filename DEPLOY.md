@@ -114,17 +114,10 @@ git push -u origin master
    - `SECRET_KEY` — случайная строка (например `openssl rand -hex 32`).
    - `CORS_ORIGINS` — домен фронта на Vercel через запятую (например `https://medhouse.vercel.app`), чтобы браузер не блокировал запросы к API. Если не задать — по умолчанию разрешены все (`*`), что подходит для разработки.
    - При необходимости: `MEDHOUSE_API_KEY_1`, `LOG_LEVEL`, `LOG_FILE`, пути к данным (`DATA_BASE_PATH`, `ANALIZ2_PATH`), ключи Google Drive и т.д. (см. `backend/.env.example`).
-3. Один раз инициализировать БД: в Railway откройте **Settings → Deploy** и добавьте одноразовую команду **Custom start command** или выполните локально, подставив `DATABASE_URL` от Supabase:
-   ```bash
-   cd backend
-   set DATABASE_URL=postgresql://...
-   python -m scripts.init_db
-   python -m scripts.create_dashboard_templates
-   ```
-   После этого верните обычный старт (или удалите custom command). Либо используйте Railway **one-off run** (если доступен) для этих команд.
+3. Один раз инициализировать БД (таблицы, админ, шаблоны): локально задайте `DATABASE_URL` строкой Postgres из Supabase и выполните `python -m scripts.init_production_db` из папки `backend`. Либо используйте Railway **One-off run** с той же командой. Подробнее — [PROD_CHECKLIST.md](PROD_CHECKLIST.md).
 4. В разделе **Networking** нажмите **Generate Domain** и сохраните URL (например `https://medhouse-backend.up.railway.app`) — он понадобится для фронта на Vercel.
 
-Запуск на Railway задаётся в `backend/railway.json` (или Procfile): `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+Запуск на Railway задаётся в `backend/railway.json`: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Версия Python — из `backend/runtime.txt` (3.11). Проверка готовности: **GET /health** и **GET /health/ready** (проверка подключения к БД).
 
 ### Vercel (фронтенд)
 
