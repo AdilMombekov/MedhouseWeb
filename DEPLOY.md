@@ -80,7 +80,19 @@ git add .
 git commit -m "Medhouse/Swiss Energy: дашборд, 7 страниц аналитики, шаблоны выгрузки"
 ```
 
-Дальше можно подключить удалённый репозиторий (GitHub, GitLab и т.д.) и выполнять `git push`.
+**Подключение нового репозитория (GitHub / GitLab):**
+
+1. Создайте новый репозиторий на [GitHub](https://github.com/new) или GitLab (без README, .gitignore и лицензии — у вас уже есть коммиты).
+2. В папке проекта выполните (подставьте свой URL):
+
+```bash
+git remote add origin https://github.com/ВАШ_ЛОГИН/medhouse.git
+git push -u origin master
+```
+
+Или по SSH: `git remote add origin git@github.com:ВАШ_ЛОГИН/medhouse.git`
+
+Дальше все изменения: `git add .` → `git commit -m "..."` → `git push`.
 
 ---
 
