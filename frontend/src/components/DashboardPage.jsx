@@ -1,8 +1,9 @@
+import { API_BASE } from '../config'
 import { Download } from 'lucide-react'
 
 export default function DashboardPage({ title, description, templateType, children }) {
   const downloadTemplate = () => {
-    window.open(`/api/templates/download-by-type/${templateType}`, '_blank')
+    window.open(`${API_BASE}/api/templates/download-by-type/${templateType}`, '_blank')
   }
 
   return (

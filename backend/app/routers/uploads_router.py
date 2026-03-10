@@ -8,8 +8,10 @@ from app.config import UPLOADS_DIR
 from app.models import User, ReportUpload
 from app.auth import require_moderator_or_admin, get_current_user
 from app.schemas import ReportUploadResponse, ReportUploadCreate
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
+logger = get_logger(__name__)
 
 
 @router.get("/", response_model=list[ReportUploadResponse])
@@ -35,6 +37,7 @@ async def upload_report(
     allowed = (".xlsx", ".xls", ".csv")
     ext = Path(file.filename or "").suffix.lower()
     if ext not in allowed:
+        logger.warning("Upload rejected: filename=%s ext=%s", file.filename, ext)
         raise HTTPException(
             status_code=400,
             detail=f"Разрешены только файлы: {', '.join(allowed)}",
@@ -57,6 +60,12 @@ async def upload_report(
     db.add(rec)
     db.commit()
     db.refresh(rec)
+    logger.info(
+        "Upload saved: id=%s file=%s user_id=%s",
+        rec.id,
+        rec.file_name,
+        current_user.id,
+    )
     return ReportUploadResponse(
         id=rec.id,
         file_name=rec.file_name,

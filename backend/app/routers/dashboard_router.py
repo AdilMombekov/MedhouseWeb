@@ -1,6 +1,5 @@
 """
-API данных для страниц дашборда: сводка, продажи, регионы, логистика, товары, план–факт, отчёт для руководства.
-Данные из папки Анализ 2 и KATO (регионы).
+API данных для страниц дашборда. Кэш 5 мин — повторные запросы отдаются мгновенно.
 """
 from pathlib import Path
 from typing import Optional, List, Any
@@ -9,9 +8,11 @@ from sqlalchemy.orm import Session
 import pandas as pd
 from app.database import get_db
 from app.config import ANALIZ2_DIR, PROJECT_ROOT
+from app.cache import cache_get, cache_set
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
-
+logger = get_logger(__name__)
 KATO_PATH = PROJECT_ROOT / "KATO_18.02.2026_ru.csv"
 
 
@@ -36,9 +37,7 @@ def _read_csv(path: Path, sep=";") -> Optional[pd.DataFrame]:
             return None
 
 
-@router.get("/summary")
-def get_summary(db: Session = Depends(get_db)):
-    """Сводка KPI по годам (Анализ 2)."""
+def _compute_summary():
     result = {"years": [], "total_value": [], "rows_count": []}
     for year in ["2020", "2021", "2022", "2023", "2024", "2025"]:
         path = ANALIZ2_DIR / f"{year}.xlsx"
@@ -59,17 +58,28 @@ def get_summary(db: Session = Depends(get_db)):
             result["total_value"].append(0)
             result["rows_count"].append(0)
     if not result["years"]:
+        logger.info("Dashboard summary: no data in ANALIZ2_DIR, returning demo aggregate")
         result = {"years": ["2020", "2021", "2022", "2023", "2024", "2025"], "total_value": [1245, 1582, 1890, 2150, 2420, 2680], "rows_count": [0] * 6}
     return result
 
 
+@router.get("/summary")
+def get_summary(db: Session = Depends(get_db)):
+    cached = cache_get("dashboard:summary")
+    if cached is not None:
+        return cached
+    out = _compute_summary()
+    cache_set("dashboard:summary", out)
+    return out
+
+
 @router.get("/sales")
-def get_sales(
-    year: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-):
-    """Динамика продаж по периодам (из Анализ 2 по годам)."""
+def get_sales(year: Optional[str] = Query(None), db: Session = Depends(get_db)):
     year = year or "2024"
+    cache_key = f"dashboard:sales:{year}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
     path = ANALIZ2_DIR / f"{year}.xlsx"
     data = []
     if path.exists():
@@ -81,31 +91,37 @@ def get_sales(
                     data.append({str(k): (v.item() if hasattr(v, "item") else v) for k, v in row_dict.items()})
     if not data:
         data = [{"Период": f"{year}-0{i}", "Сумма": 100 * (i + 1), "Количество": 10 * i} for i in range(1, 10)]
-    return {"year": year, "items": data[:50]}
+    out = {"year": year, "items": data[:50]}
+    cache_set(cache_key, out)
+    return out
 
 
 @router.get("/regions")
-def get_regions(
-    db: Session = Depends(get_db),
-):
-    """Регионы и филиалы (KATO)."""
+def get_regions(db: Session = Depends(get_db)):
+    cached = cache_get("dashboard:regions")
+    if cached is not None:
+        return cached
     df = _read_csv(KATO_PATH)
     if df is None or df.empty:
-        return {"regions": [{"code": "—", "name": "Загрузите KATO_18.02.2026_ru.csv", "parent_id": 0}], "total": 0}
-    # Берём верхний уровень (области) и часть городов
-    roots = df[df["parent_id"] == 0].head(20)
-    regions = []
-    for _, r in roots.iterrows():
-        regions.append({"id": int(r["id"]), "code": str(r.get("code", "")), "name": str(r.get("name", "")), "parent_id": int(r["parent_id"])})
-    children = df[df["parent_id"].isin(roots["id"])].head(80)
-    for _, r in children.iterrows():
-        regions.append({"id": int(r["id"]), "code": str(r.get("code", "")), "name": str(r.get("name", "")), "parent_id": int(r["parent_id"])})
-    return {"regions": regions, "total": len(regions)}
+        out = {"regions": [{"id": 0, "code": "—", "name": "Загрузите KATO_18.02.2026_ru.csv", "parent_id": 0}], "total": 0}
+    else:
+        roots = df[df["parent_id"] == 0].head(20)
+        regions = []
+        for _, r in roots.iterrows():
+            regions.append({"id": int(r["id"]), "code": str(r.get("code", "")), "name": str(r.get("name", "")), "parent_id": int(r["parent_id"])})
+        children = df[df["parent_id"].isin(roots["id"])].head(80)
+        for _, r in children.iterrows():
+            regions.append({"id": int(r["id"]), "code": str(r.get("code", "")), "name": str(r.get("name", "")), "parent_id": int(r["parent_id"])})
+        out = {"regions": regions, "total": len(regions)}
+    cache_set("dashboard:regions", out)
+    return out
 
 
 @router.get("/logistics")
 def get_logistics(db: Session = Depends(get_db)):
-    """Логистика (из Анализ 2/Логистика.xlsx или демо)."""
+    cached = cache_get("dashboard:logistics")
+    if cached is not None:
+        return cached
     path = ANALIZ2_DIR / "Логистика.xlsx"
     items = []
     if path.exists():
@@ -115,16 +131,18 @@ def get_logistics(db: Session = Depends(get_db)):
                 items.append({str(k): (v.item() if hasattr(v, "item") else v) for k, v in row.dropna().to_dict().items()})
     if not items:
         items = [{"Склад": f"Склад {i}", "Приход": 100 * i, "Расход": 80 * i, "Остаток": 20 * i} for i in range(1, 11)]
-    return {"items": items}
+    out = {"items": items}
+    cache_set("dashboard:logistics", out)
+    return out
 
 
 @router.get("/products")
-def get_products(
-    year: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-):
-    """Товарная номенклатура / продажи по товарам (из Анализ 2 по году)."""
+def get_products(year: Optional[str] = Query(None), db: Session = Depends(get_db)):
     year = year or "2024"
+    cache_key = f"dashboard:products:{year}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
     path = ANALIZ2_DIR / f"{year}.xlsx"
     items = []
     if path.exists():
@@ -134,16 +152,18 @@ def get_products(
                 items.append({str(k): (v.item() if hasattr(v, "item") else v) for k, v in row.dropna().to_dict().items()})
     if not items:
         items = [{"Наименование": f"Товар {i}", "Группа": "Парафармация", "Кол-во": 100 * i, "Сумма": 5000 * i} for i in range(1, 16)]
-    return {"year": year, "items": items}
+    out = {"year": year, "items": items}
+    cache_set(cache_key, out)
+    return out
 
 
 @router.get("/plan-fact")
-def get_plan_fact(
-    year: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-):
-    """План–факт по периодам."""
+def get_plan_fact(year: Optional[str] = Query(None), db: Session = Depends(get_db)):
     year = year or "2025"
+    cache_key = f"dashboard:plan_fact:{year}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
     path = ANALIZ2_DIR / f"{year}.xlsx"
     items = []
     if path.exists():
@@ -155,12 +175,16 @@ def get_plan_fact(
                     items.append({str(k): (v.item() if hasattr(v, "item") else v) for k, v in d.items()})
     if not items:
         items = [{"Период": f"{year}-{str(i).zfill(2)}", "План": 2000 + i * 100, "Факт": 1800 + i * 120, "Выполнение %": round((1800 + i * 120) / (2000 + i * 100) * 100, 1)} for i in range(1, 13)]
-    return {"year": year, "items": items}
+    out = {"year": year, "items": items}
+    cache_set(cache_key, out)
+    return out
 
 
 @router.get("/executive")
 def get_executive(db: Session = Depends(get_db)):
-    """Отчёт для руководства — сводный one-pager."""
+    cached = cache_get("dashboard:executive")
+    if cached is not None:
+        return cached
     summary = {"years": [], "total_value": [], "rows_count": []}
     for year in ["2022", "2023", "2024", "2025"]:
         path = ANALIZ2_DIR / f"{year}.xlsx"
@@ -174,8 +198,10 @@ def get_executive(db: Session = Depends(get_db)):
                 summary["rows_count"].append(len(df))
     if not summary["years"]:
         summary = {"years": ["2022", "2023", "2024", "2025"], "total_value": [1890, 2150, 2420, 2680], "rows_count": [100, 120, 130, 140]}
-    return {
+    out = {
         "summary": summary,
         "companies": ["Медхаус", "Свисс Энерджи"],
         "description": "Сводные показатели по годам для руководства.",
     }
+    cache_set("dashboard:executive", out)
+    return out

@@ -9,6 +9,8 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 backend/credentials.json
 backend/token.json
+backend/service_account_pharmacy_bot.json
+backend/*service_account*.json
 
 # Node
 frontend/node_modules/
@@ -24,7 +26,10 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Локальные данные (опционально — раскомментируйте, если не хранить в репозитории)
-# Анализ 2/
-# *.xlsx
-# *.xls
+# Локальные данные и выгрузки (не коммитить в репозиторий)
+/база для данных/
+/Анализ 2/
+/*.xlsx
+/*.xls
+/logs/
+backend/logs/

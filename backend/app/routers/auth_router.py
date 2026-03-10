@@ -5,8 +5,10 @@ from app.database import get_db
 from app.auth import authenticate_user, create_access_token, get_current_user
 from app.schemas import Token, UserResponse
 from app.models import User
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = get_logger(__name__)
 
 
 @router.post("/login", response_model=Token)
@@ -16,8 +18,10 @@ def login(
 ):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        logger.warning("Login failed: email=%s", form_data.username)
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     token = create_access_token(data={"sub": user.email})
+    logger.info("Login success: email=%s role=%s", user.email, user.role)
     return Token(
         access_token=token,
         user=UserResponse(

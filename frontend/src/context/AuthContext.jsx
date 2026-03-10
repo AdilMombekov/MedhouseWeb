@@ -2,8 +2,10 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 
 const AuthContext = createContext(null)
 
+import { API_BASE } from '../config'
+
 const TOKEN_KEY = 'medhouse_token'
-const API = '/api'
+const API = API_BASE + '/api'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)

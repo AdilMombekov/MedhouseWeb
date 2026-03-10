@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE } from '../config'
 import { Download } from 'lucide-react'
 
 export default function Templates() {
@@ -11,7 +12,7 @@ export default function Templates() {
   }, [])
 
   const download = (id, fileName) => {
-    window.open(`/api/templates/download/${id}`, '_blank')
+    window.open(`${API_BASE}/api/templates/download/${id}`, '_blank')
   }
 
   return (

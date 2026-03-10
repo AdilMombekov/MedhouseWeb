@@ -4,8 +4,10 @@ from app.database import get_db
 from app.models import User, Role
 from app.auth import require_admin, get_password_hash
 from app.schemas import UserCreate, UserResponse
+from app.logging_config import get_logger
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = get_logger(__name__)
 
 
 @router.get("/", response_model=list[UserResponse])
@@ -23,6 +25,7 @@ def create_user(
     current_user: User = Depends(require_admin),
 ):
     if db.query(User).filter(User.email == data.email).first():
+        logger.warning("Create user: duplicate email=%s", data.email)
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже есть")
     user = User(
         email=data.email,
@@ -33,6 +36,7 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    logger.info("User created: id=%s email=%s role=%s", user.id, user.email, user.role)
     return UserResponse(
         id=user.id,
         email=user.email,

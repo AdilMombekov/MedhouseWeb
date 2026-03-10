@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text, Float
 from app.database import Base
 import enum
 
@@ -70,3 +70,58 @@ class AnalysisDataset(Base):
     period = Column(String(50), nullable=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MailingBatch(Base):
+    """Партия рассылки из 1С (один загруженный файл «Выгрузка XLSX»)."""
+    __tablename__ = "mailing_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_file = Column(String(255), nullable=False)
+    sheet_name = Column(String(128), nullable=True)
+    row_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MailingRow(Base):
+    """Одна строка из рассылки 1С (реализация/документ). Все поля — в raw_data (JSON), ключевые продублированы для выборок."""
+    __tablename__ = "mailing_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(Integer, ForeignKey("mailing_batches.id"), nullable=False, index=True)
+    row_index = Column(Integer, nullable=False)
+    period_date = Column(String(20), nullable=True, index=True)  # 04.03.2026
+    organization = Column(String(100), nullable=True, index=True)  # MedHouse
+    kontragent = Column(String(255), nullable=True, index=True)
+    nomerklatura = Column(String(512), nullable=True)
+    amount = Column(Float, nullable=True)  # сумма продажи (в единицах)
+    profit = Column(Float, nullable=True)  # Profit (тенге)
+    raw_data = Column(Text, nullable=True)  # JSON со всеми колонками строки
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class GoogleSheet(Base):
+    """Реестр Google Таблиц, доступных сервисному аккаунту (обнаружены через Drive/Sheets API)."""
+    __tablename__ = "google_sheets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    spreadsheet_id = Column(String(128), unique=True, nullable=False, index=True)
+    name = Column(String(512), nullable=True)
+    folder_id = Column(String(128), nullable=True, index=True)
+    web_view_link = Column(String(512), nullable=True)
+    sheet_count = Column(Integer, default=0)
+    last_synced_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class GoogleSheetSnapshot(Base):
+    """Снимок одного листа таблицы: данные залогированы в data_json (массив строк)."""
+    __tablename__ = "google_sheet_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    spreadsheet_id = Column(String(128), nullable=False, index=True)
+    sheet_name = Column(String(256), nullable=False, index=True)
+    row_count = Column(Integer, default=0)
+    col_count = Column(Integer, default=0)
+    data_json = Column(Text, nullable=True)  # JSON: [[cell, cell, ...], ...]
+    synced_at = Column(DateTime, default=datetime.utcnow)

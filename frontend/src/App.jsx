@@ -12,6 +12,7 @@ import Import from './pages/Import'
 import Templates from './pages/Templates'
 import Admin from './pages/Admin'
 import GoogleDrive from './pages/GoogleDrive'
+import Map from './pages/Map'
 import { useAuth } from './context/AuthContext'
 
 function Protected({ children, requireModerator }) {
@@ -38,6 +39,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="sales" element={<DashboardSales />} />
         <Route path="regions" element={<DashboardRegions />} />
+        <Route path="map" element={<Map />} />
         <Route path="logistics" element={<DashboardLogistics />} />
         <Route path="products" element={<DashboardProducts />} />
         <Route path="plan-fact" element={<DashboardPlanFact />} />

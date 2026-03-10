@@ -77,3 +77,96 @@
 - Часть **`1ABC...xyz`** — это ID. Вставьте его в поле «ID папки на Google Drive» на вкладке Google Drive в дашборде и нажмите «Список файлов».
 
 После настройки вы можете присылать ссылки на папки/документы с управленческой отчётностью по городам и центральному офису — в интерфейсе будет возможность выбирать эти источники и использовать данные для аналитики.
+
+---
+
+## Вариант 2: Сервисный аккаунт (без входа в браузере)
+
+Для доступа к **папке ПНЛ** и будущей вкладки «ПНЛ» на сайте удобнее использовать **сервисный аккаунт** — тогда бэкенд читает Drive без OAuth в браузере.
+
+### Сервисный аккаунт проекта
+
+- **Email:** `pharmacy-bot@pharmacy-bot-487900.iam.gserviceaccount.com`
+- **Проект:** pharmacy-bot-487900 (Google Cloud Console).
+
+### Шаги
+
+1. **Создать ключ сервисного аккаунта (если ещё нет)**  
+   - [Учётные данные](https://console.cloud.google.com/apis/credentials?project=pharmacy-bot-487900) → раздел «Сервисные аккаунты» → выберите `pharmacy-bot@...` → вкладка «Ключи» → «Добавить ключ» → «Создать ключ» → JSON.  
+   - Сохраните скачанный JSON.
+
+2. **Установить ключ в проект**  
+   - Переименуйте файл в **`service_account_pharmacy_bot.json`** (или укажите своё имя в переменной окружения `GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE`).  
+   - Положите его в папку **`backend`** (рядом с `app/` и `main.py`).  
+   - **Не коммитьте этот файл в Git** (добавьте в `.gitignore`).
+
+3. **Открыть доступ к папке ПНЛ для сервисного аккаунта**  
+   - Откройте папку в Google Drive: [Папка ПНЛ](https://drive.google.com/drive/folders/1f-3_NyHFIRBGtXf8-aoJBy4yjtNYN6rx).  
+   - Нажмите «Настройки доступа» (или «Поделиться») и добавьте пользователя:  
+     **`pharmacy-bot@pharmacy-bot-487900.iam.gserviceaccount.com`**  
+   - Выдайте роль **«Читатель»** (или «Редактор», если нужно менять файлы).  
+   - Сохраните. После этого бэкенд сможет читать содержимое этой папки без вашего входа.
+
+4. **Перезапустить бэкенд**  
+   Приоритет: если в `backend` есть `service_account_pharmacy_bot.json`, используется он; иначе — OAuth (`credentials.json` + `token.json`).
+
+---
+
+## Папка ПНЛ для вкладки на сайте
+
+- **Ссылка:** [https://drive.google.com/drive/folders/1f-3_NyHFIRBGtXf8-aoJBy4yjtNYN6rx](https://drive.google.com/drive/folders/1f-3_NyHFIRBGtXf8-aoJBy4yjtNYN6rx)  
+- **ID папки:** `1f-3_NyHFIRBGtXf8-aoJBy4yjtNYN6rx`  
+- **Назначение:** данные для будущей отдельной вкладки **«ПНЛ»** на сайте (прайс-листы, нормативы и т.п.). Папке выдан полный доступ для сервисного аккаунта `pharmacy-bot@pharmacy-bot-487900.iam.gserviceaccount.com`.
+
+### API для вкладки ПНЛ
+
+- **GET /api/google-drive/pnl** (с авторизацией) — список файлов и подпапок в папке ПНЛ.  
+  Ответ: метаданные папки и массив `items` (id, name, mimeType, modifiedTime, size, webViewLink). Подпапки выводятся первыми.  
+  Опционально: параметр `folder_id` — просмотр другой папки (если у сервисного аккаунта есть к ней доступ).
+
+- **GET /api/google-drive/status** — в ответе есть `pnl_folder_id` и `auth_type` (service_account / oauth).
+
+На фронте будущей вкладки «ПНЛ» можно вызывать `/api/google-drive/pnl`, отображать дерево/список и ссылки на просмотр файлов (`webViewLink`) или скачивание через `/api/google-drive/read?file_id=...`.
+
+---
+
+## Google Таблицы (Sheets) — изучение и логирование
+
+Все **Google Таблицы**, к которым у сервисного аккаунта (или OAuth) есть доступ, можно один раз обнаружить и **залогировать в БД** — затем читать данные через API без повторного обращения к Google.
+
+### Включение Google Sheets API
+
+1. В [Google Cloud Console](https://console.cloud.google.com/apis/library?project=pharmacy-bot-487900) найдите **Google Sheets API** и нажмите **Включить**.
+2. Учётные данные те же: сервисный аккаунт или OAuth (скрипт и API используют общие creds с областью `spreadsheets.readonly`).
+
+### Синхронизация (обнаружение и логирование)
+
+Из папки `backend` выполните:
+
+```bash
+python -m scripts.sync_google_sheets
+```
+
+Скрипт:
+
+- находит **все** таблицы, к которым у аккаунта есть доступ (в т.ч. расшаренные папки, например ПНЛ);
+- для каждой таблицы получает список листов и скачивает значения каждого листа (до 5000 строк на лист);
+- сохраняет в БД: реестр таблиц (`google_sheets`) и снимки листов (`google_sheet_snapshots` с полем `data_json`).
+
+Запускайте скрипт периодически (cron/планировщик), чтобы обновлять снимки.
+
+### API залогированных таблиц
+
+Все эндпоинты требуют авторизации (JWT или API-ключ).
+
+| Метод | URL | Описание |
+|--------|-----|----------|
+| GET | **/api/google-sheets/list** | Список всех залогированных таблиц (id, name, spreadsheet_id, web_view_link, sheet_count, last_synced_at). |
+| GET | **/api/google-sheets/sheets/{spreadsheet_id}** | Список листов одной таблицы (имена, row_count, col_count, synced_at). |
+| GET | **/api/google-sheets/data/{spreadsheet_id}?sheet_name=...** | Данные одного листа (массив строк `values`). Параметр `max_rows` — ограничить число строк. |
+| GET | **/api/google-sheets/stats** | Сводка: количество таблиц и снимков в БД. |
+
+### Таблицы в БД
+
+- **google_sheets** — реестр: `spreadsheet_id`, `name`, `folder_id`, `web_view_link`, `sheet_count`, `last_synced_at`.
+- **google_sheet_snapshots** — снимок листа: `spreadsheet_id`, `sheet_name`, `row_count`, `col_count`, `data_json` (JSON-массив строк ячеек), `synced_at`.

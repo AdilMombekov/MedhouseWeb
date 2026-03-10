@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE } from '../config'
 import { TrendingUp, Building2, Package, Download } from 'lucide-react'
 
 export default function Dashboard() {
@@ -16,22 +17,18 @@ export default function Dashboard() {
     let cancelled = false
     const controller = new AbortController()
     const opts = { signal: controller.signal }
-    const timeoutId = setTimeout(() => {
-      controller.abort()
-    }, 15000)
-    Promise.all([
-      api('/analytics/sources', opts)
-        .then((r) => (r.ok ? r.json() : { sources: [] }))
-        .catch(() => ({ sources: [] })),
-      api('/analytics/aggregate?years=2020,2021,2022,2023,2024,2025', opts)
-        .then((r) => (r.ok ? r.json() : { data: [], meta: {} }))
-        .catch(() => ({ data: [], meta: {} })),
-    ])
-      .then(([s, a]) => {
-        if (!cancelled) {
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    api('/analytics/bootstrap', opts)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        if (data) {
           setError(null)
-          setSources(Array.isArray(s.sources) ? s.sources : [])
-          setAggregate(a)
+          setSources(Array.isArray(data.sources) ? data.sources : [])
+          setAggregate(data.aggregate || { data: [], meta: {} })
+        } else {
+          setSources([])
+          setAggregate({ data: [], meta: {} })
         }
       })
       .catch(() => {
@@ -60,7 +57,7 @@ export default function Dashboard() {
   }
 
   const downloadSummaryTemplate = () => {
-    window.open('/api/templates/download-by-type/dashboard_summary', '_blank')
+    window.open(`${API_BASE}/api/templates/download-by-type/dashboard_summary`, '_blank')
   }
 
   return (

@@ -1,11 +1,12 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Upload, FileSpreadsheet, Users, Cloud, LogOut, ShoppingCart, MapPin, Truck, Package, Target, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Upload, FileSpreadsheet, Users, Cloud, LogOut, ShoppingCart, MapPin, Truck, Package, Target, Briefcase, Map } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const nav = [
   { to: '/', label: 'Сводка (KPI)', icon: LayoutDashboard },
   { to: '/sales', label: 'Продажи', icon: ShoppingCart },
   { to: '/regions', label: 'Регионы и филиалы', icon: MapPin },
+  { to: '/map', label: 'Карта точек', icon: Map },
   { to: '/logistics', label: 'Логистика', icon: Truck },
   { to: '/products', label: 'Товарная номенклатура', icon: Package },
   { to: '/plan-fact', label: 'План–факт', icon: Target },
