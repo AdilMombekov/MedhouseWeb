@@ -16,7 +16,8 @@ LOG_FILE = os.getenv("LOG_FILE", "").strip()  # например backend/logs/ap
 _cors_raw = os.getenv("CORS_ORIGINS", "").strip()
 CORS_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()] if _cors_raw else ["*"]
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./medhouse.db")
+_raw_db = (os.getenv("DATABASE_URL") or "").strip()
+DATABASE_URL = _raw_db if _raw_db else "sqlite:///./medhouse.db"
 
 # Supabase (опционально): URL и ключи для клиента/будущих фич. Для БД используется Postgres connection string в DATABASE_URL (Supabase → Settings → Database).
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
