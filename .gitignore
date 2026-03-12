@@ -16,6 +16,9 @@ backend/*service_account*.json
 frontend/node_modules/
 frontend/dist/
 
+# Railway (привязка проекта — локально)
+.railway/
+
 # IDE
 .idea/
 .vscode/
